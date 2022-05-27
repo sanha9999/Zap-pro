@@ -32,7 +32,9 @@ def detection(net, output_layer, min_confidence, frame, classes):
 
     for out in outs:
         for detection in out:
+            
             scores = detection[5:]
+            
             class_id = np.argmax(scores)
             confidence = scores[class_id]
             if class_id == 0 and confidence > min_confidence:
@@ -52,11 +54,11 @@ def detection(net, output_layer, min_confidence, frame, classes):
     indexes = cv2.dnn.NMSBoxes(boxes, confidences, min_confidence, 0.5, 0.4)
 
     font = cv2.FONT_HERSHEY_DUPLEX
+
     for i in range(len(boxes)):
         if i in indexes:
             x, y, w, h = boxes[i]
             label = "{}".format(classes[class_ids[i]])
-            #print(i, label)
             
             cv2.rectangle(img, (x, y), (x + w, y + h), (255, 255, 255), 2)
             cv2.putText(img, label, (x, y - 5), font, 1, (255, 255, 255), 1)
@@ -83,7 +85,7 @@ def main(config):
         classes = [line.strip() for line in f.readlines()]
     layer_names = net.getLayerNames()
     
-    output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
+    output_layers = [layer_names[i[0] - 1] for i in net.getUnconnectedOutLayers()]
     
 
     cap = cv2.VideoCapture(video_path)
@@ -104,4 +106,3 @@ def main(config):
 if __name__ == "__main__":
     config = define_argparser()
     main(config)
-
