@@ -121,20 +121,10 @@ def associate_detections_to_trackers(detections,trackers,iou_threshold = 0.3):
   unmatched_detections 및 unmatched_trackers와 match 3 개의 목록을 반환합니다.
   """
 
-  # 추적 하는게 없다면 반환
   if(len(trackers)==0):
     return np.empty((0,2),dtype=int), np.arange(len(detections)), np.empty((0,5),dtype=int)
-  
+
   iou_matrix = iou(detections, trackers)
-
-
-
-  for d,det in enumerate(detections):
-    for t,trk in enumerate(trackers):
-      iou_matrix[d,t] = iou(det,trk)
-  
-  #Hungarian Algorithm
-  matched_indices = linear_assignment(-iou_matrix)
 
   if min(iou_matrix.shape) > 0:
     a = (iou_matrix > iou_threshold).astype(np.int32)
@@ -146,18 +136,18 @@ def associate_detections_to_trackers(detections,trackers,iou_threshold = 0.3):
     matched_indices = np.empty(shape=(0,2))
 
   unmatched_detections = []
-  for d,det in enumerate(detections):
+  for d, det in enumerate(detections):
     if(d not in matched_indices[:,0]):
       unmatched_detections.append(d)
   unmatched_trackers = []
-  for t,trk in enumerate(trackers):
+  for t, trk in enumerate(trackers):
     if(t not in matched_indices[:,1]):
       unmatched_trackers.append(t)
 
-  #낮은 IOU와 일치하는 filter
+  #filter out matched with low IOU
   matches = []
   for m in matched_indices:
-    if(iou_matrix[m[0],m[1]]<iou_threshold):
+    if(iou_matrix[m[0], m[1]]<iou_threshold):
       unmatched_detections.append(m[0])
       unmatched_trackers.append(m[1])
     else:
@@ -186,37 +176,35 @@ class Sort(object):
     NOTE: 반환 된 object 수는 제공된 detection 수와 다를 수 있습니다.
     """
     self.frame_count += 1
-    # existing trackers로 부터 예상위치를 얻는다
-    trks = np.zeros((len(self.trackers),5))
+    # get predicted locations from existing trackers.
+    trks = np.zeros((len(self.trackers), 5))
     to_del = []
     ret = []
-    for t,trk in enumerate(trks):
+    for t, trk in enumerate(trks):
       pos = self.trackers[t].predict()[0]
       trk[:] = [pos[0], pos[1], pos[2], pos[3], 0]
-      if(np.any(np.isnan(pos))):
+      if np.any(np.isnan(pos)):
         to_del.append(t)
     trks = np.ma.compress_rows(np.ma.masked_invalid(trks))
     for t in reversed(to_del):
       self.trackers.pop(t)
     matched, unmatched_dets, unmatched_trks = associate_detections_to_trackers(dets,trks, self.iou_threshold)
 
-    # 지정된 detection이 있는 tracker 업데이트
-    for t,trk in enumerate(self.trackers):
-      if(t not in unmatched_trks):
-        d = matched[np.where(matched[:,1]==t)[0],0]
-        trk.update(dets[d,:][0])
+    # update matched trackers with assigned detections
+    for m in matched:
+      self.trackers[m[1]].update(dets[m[0], :])
 
-    # unmatched detections을 위한 새로운 tracker 생성/초기화
+    # create and initialise new trackers for unmatched detections
     for i in unmatched_dets:
-        trk = KalmanBoxTracker(dets[i,:])
+        trk = KalmanBoxTracker(dets[i][:])
         self.trackers.append(trk)
     i = len(self.trackers)
     for trk in reversed(self.trackers):
         d = trk.get_state()[0]
-        if((trk.time_since_update < 1) and (trk.hit_streak >= self.min_hits or self.frame_count <= self.min_hits)):
+        if (trk.time_since_update < 1) and (trk.hit_streak >= self.min_hits or self.frame_count <= self.min_hits):
           ret.append(np.concatenate((d,[trk.id+1])).reshape(1,-1)) # +1 as MOT benchmark requires positive
         i -= 1
-        # dead tracklet 제거
+        # remove dead tracklet
         if(trk.time_since_update > self.max_age):
           self.trackers.pop(i)
     if(len(ret)>0):
