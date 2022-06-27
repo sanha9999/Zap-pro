@@ -5,7 +5,7 @@ import numpy as np
 import argparse
 import os
 
-from kalmanfilter import Sort
+from kalmanfilter import *
 
 os.environ['KMP_DUPLICATE_LIB_OK']='True' # OMP: Error #15
 
@@ -23,42 +23,38 @@ def load_model():
     model.eval()
     return model
 
-def detection(model, min_confidence, frame):
+def detection(model, mot_tracker, min_confidence, frame):
     start_time = time.time()
     font = cv2.FONT_HERSHEY_DUPLEX
     
     img = cv2.resize(frame, None, fx=0.8, fy=0.8)
     
     outs = model(img)
-    outs = outs.xyxy[0]
+    outs = outs.pred[0].cpu().numpy()
+    track_bbs_ids = mot_tracker.update(outs)
     
-
-    for detection in outs:
+    for i in range(len(track_bbs_ids.tolist())):
         
-        confidence = detection[4]
-        class_id = int(detection[5])
+        coords = track_bbs_ids.tolist()[i]
+        x1, y1, x2, y2 = int(coords[0]), int(coords[1]), int(coords[2]), int(coords[3])
+        name_idx = int(coords[4])
+        name = "Id : {}".format(str(name_idx))
+        cv2.rectangle(img, (x1, y1), (x2, y2), (255, 255, 255), 2)
+        cv2.putText(img, name, (x1, y1 - 5), font, 1, (255, 255, 255), 1)
 
-        if class_id == 0 and confidence > min_confidence:
-            x_min = int(detection[0])
-            y_min = int(detection[1])
-            x_max = int(detection[2])
-            y_max = int(detection[3])
-               
-            cv2.rectangle(img, (x_min, y_min), (x_max, y_max), (255, 255, 255), 2)
-            cv2.putText(img, "person", (x_min, y_min - 5), font, 1, (255, 255, 255), 1)
-
-    #process_time = end_time - start_time
-    #print("=== {:.3f} seconds".format(process_time))
+    
     cv2.imshow("test", img)
 
-def main(config):
+def main(config):    
     video_path = config.video_path
-    min_confidence = 0.4
+    min_confidence = 0.5
     
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     model = load_model()
     model.to(device)
+
+    mot_tracker = Sort()
 
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened:
@@ -70,7 +66,7 @@ def main(config):
             print('--@@@@@ No captured frame @@@@@--')
             break
         else:
-            detection(model , min_confidence, frame)
+            detection(model, mot_tracker, min_confidence, frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
     cv2.destroyAllWindows()
