@@ -6,6 +6,7 @@ import argparse
 import os
 
 from kalmanfilter import *
+from mouse_event import *
 
 os.environ['KMP_DUPLICATE_LIB_OK']='True' # OMP: Error #15
 
@@ -19,7 +20,7 @@ def define_argparser():
     return config
 
 def load_model():
-    model = torch.hub.load('ultralytics/yolov5', 'yolov5s', verbose=False)
+    model = torch.hub.load('ultralytics/yolov5', 'yolov5m', verbose=False)
     model.eval()
     return model
 
@@ -57,6 +58,8 @@ def main(config):
     mot_tracker = Sort()
 
     cap = cv2.VideoCapture(video_path)
+
+    start = 0
     if not cap.isOpened:
         print('--@@@@@ ERROR @@@@@--')
         exit(0)
@@ -66,7 +69,11 @@ def main(config):
             print('--@@@@@ No captured frame @@@@@--')
             break
         else:
-            detection(model, mot_tracker, min_confidence, frame)
+            if start == 0:
+                MouseEvent(frame)
+                start += 1
+            else:
+                detection(model, mot_tracker, min_confidence, frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
     cv2.destroyAllWindows()
@@ -74,4 +81,3 @@ def main(config):
 if __name__ == "__main__":
     config = define_argparser()
     main(config)
-
