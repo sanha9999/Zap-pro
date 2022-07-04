@@ -25,9 +25,7 @@ def get_background_points(img):
 
     return points
 
-def MouseEvent(frame):
-    field_path = 'C:/Users/kangsanha/Desktop/zappro/zzappro/img/field.png'
-    field_img = cv2.imread(field_path)
+def MouseEvent(frame, field_img):
     
     frame = cv2.resize(frame, None, fx=0.8, fy=0.8)
     point_gt = get_background_points(frame)
