@@ -33,4 +33,5 @@ def MouseEvent(frame):
     point_gt = get_background_points(frame)
     
     point_field = get_background_points(field_img)
-
+    
+    return [point_gt, point_field]
